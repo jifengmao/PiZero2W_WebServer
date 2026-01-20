@@ -5,5 +5,18 @@ modfiy the following
 2) working folder
 3) command linee = python /path/to/zero2w_webserver.py
 
+sudo systemctl daemon-reload
+
 sudo systemctl enable zero2w_weberser.service
+
 sudo systemctl start zero2w_weberser.service
+
+*************************
+
+combined with following command
+
+sudo systemctl status zero2w_weberser.service
+
+sudo systemctl stop zero2w_weberser.service
+
+sudo systemctl restart zero2w_weberser.service
