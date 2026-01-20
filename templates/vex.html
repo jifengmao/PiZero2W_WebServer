@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VEX USB Communication</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e8e8e8;
+            overflow-x: hidden;
+        }
+        
+        /* Animated background grid */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: slideDown 0.8s ease-out;
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 900;
+            background: linear-gradient(90deg, #00ff88, #00d4ff, #00ff88);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 3s linear infinite;
+            text-shadow: 0 0 40px rgba(0, 255, 136, 0.3);
+            letter-spacing: 4px;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            color: #888;
+            margin-top: 8px;
+            letter-spacing: 2px;
+        }
+        
+        .usb-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 15px;
+            padding: 8px 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .usb-status.connected {
+            color: #00ff88;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+        
+        .usb-status.disconnected {
+            color: #ff4757;
+            border: 1px solid rgba(255, 71, 87, 0.3);
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+        
+        .panels-container {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        
+        .panel {
+            background: linear-gradient(145deg, rgba(30, 30, 50, 0.9), rgba(20, 20, 35, 0.95));
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 
+                0 10px 40px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            animation: fadeIn 0.6s ease-out;
+            animation-fill-mode: both;
+        }
+        
+        .panel:nth-child(1) { animation-delay: 0.1s; }
+        .panel:nth-child(2) { animation-delay: 0.2s; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .panel h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 0;
+        }
+        
+        .panel.send-panel h2 {
+            color: #00ff88;
+        }
+        
+        .panel.send-panel h2::before {
+            content: '↑';
+            font-size: 1.4rem;
+        }
+        
+        .panel.receive-panel h2 {
+            color: #00d4ff;
+        }
+        
+        .panel.receive-panel h2::before {
+            content: '↓';
+            font-size: 1.4rem;
+        }
+        
+        .message-area {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            min-height: 150px;
+            max-height: 250px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.7;
+        }
+        
+        /* Taller send log to show more history */
+        .send-panel .message-area {
+            min-height: 300px;
+            max-height: 500px;
+        }
+        
+        .message-area::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .message-area::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+        
+        .send-panel .message-area::-webkit-scrollbar-thumb {
+            background: #00ff88;
+            border-radius: 3px;
+        }
+        
+        .receive-panel .message-area::-webkit-scrollbar-thumb {
+            background: #00d4ff;
+            border-radius: 3px;
+        }
+        
+        .message-line {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        
+        .message-line:last-child {
+            border-bottom: none;
+        }
+        
+        .send-panel .message-line {
+            color: #00ff88;
+        }
+        
+        .receive-panel .message-line {
+            color: #00d4ff;
+        }
+        
+        .message-line.error {
+            color: #ff4757;
+        }
+        
+        /* Textarea input */
+        .textarea-group {
+            margin-top: 15px;
+        }
+        
+        .textarea-group textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 14px 18px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            outline: none;
+            resize: vertical;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        .textarea-group textarea:focus {
+            border-color: #00ff88;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.1);
+        }
+        
+        .textarea-group textarea::placeholder {
+            color: #555;
+        }
+        
+        .textarea-hint {
+            font-size: 0.75rem;
+            color: #555;
+            margin-top: 8px;
+        }
+        
+        .textarea-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+        
+        .btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.4s, height 0.4s;
+        }
+        
+        .btn:hover::after {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .btn-send {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            color: #0a0a0a;
+            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.3);
+        }
+        
+        .btn-send:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(0, 255, 136, 0.5);
+        }
+        
+        .btn-send:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .btn-clear {
+            background: transparent;
+            color: #888;
+            border: 1px solid #444;
+            padding: 8px 16px;
+            font-size: 0.75rem;
+        }
+        
+        .btn-clear:hover {
+            border-color: #666;
+            color: #aaa;
+        }
+        
+        .btn-download {
+            background: transparent;
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+            padding: 8px 16px;
+            font-size: 0.75rem;
+        }
+        
+        .btn-download:hover {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: #00d4ff;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #444;
+            font-size: 0.85rem;
+        }
+        
+        .empty-state {
+            color: #444;
+            text-align: center;
+            padding: 40px 20px;
+            font-style: italic;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>VEX USB COMM</h1>
+            <p class="subtitle">Pi Zero 2W ↔ VEX Brain Serial Bridge</p>
+            <div class="usb-status {{ 'connected' if usb_connected else 'disconnected' }}" id="usb-status">
+                <span class="status-dot"></span>
+                <span id="usb-status-text">{{ 'USB Connected: ' + usb_port if usb_connected else 'USB Disconnected' }}</span>
+            </div>
+        </header>
+        
+        <div class="panels-container">
+            <!-- SEND PANEL -->
+            <div class="panel send-panel">
+                <div class="panel-header">
+                    <h2>Send to Robot</h2>
+                </div>
+                
+                <div class="message-area" id="send-log">
+                    <div class="empty-state">No messages sent yet...</div>
+                </div>
+                
+                <div class="textarea-group">
+                    <textarea id="send-textarea" placeholder="Paste or type commands here (separated by newline or semicolon)..."></textarea>
+                    <div class="textarea-hint">Separated by newline or semicolon. Ctrl+Enter to send. ↑/↓ arrows for history.</div>
+                    <div class="textarea-actions">
+                        <button class="btn btn-send" onclick="sendCommands()">Send</button>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn btn-clear" onclick="clearSendLog()">Clear Log</button>
+                </div>
+            </div>
+            
+            <!-- RECEIVE PANEL -->
+            <div class="panel receive-panel">
+                <div class="panel-header">
+                    <h2>Received from Robot</h2>
+                </div>
+                <div class="message-area" id="receive-log">
+                    <div class="empty-state">Waiting for incoming messages...</div>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-clear" onclick="clearReceiveLog()">Clear Log</button>
+                    <button class="btn btn-download" onclick="downloadReceivedMessages()">Download</button>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Pi Zero 2W • USB Serial {{ usb_port }} @ {{ baud_rate }} baud</p>
+        </footer>
+    </div>
+    
+    <script>
+        let sendLogEmpty = true;
+        let receiveLogEmpty = true;
+        let lastMessageId = 0;
+        let allReceivedMessages = [];
+        
+        // Command history for arrow key navigation
+        let commandHistory = [];
+        let historyIndex = -1;
+        let tempInput = '';  // Store current input when navigating history
+        
+        function addToSendLog(message, isError = false) {
+            const log = document.getElementById('send-log');
+            if (sendLogEmpty) {
+                log.innerHTML = '';
+                sendLogEmpty = false;
+            }
+            const div = document.createElement('div');
+            div.className = 'message-line' + (isError ? ' error' : '');
+            div.textContent = message;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function addToReceiveLog(message) {
+            const log = document.getElementById('receive-log');
+            if (receiveLogEmpty) {
+                log.innerHTML = '';
+                receiveLogEmpty = false;
+            }
+            const div = document.createElement('div');
+            div.className = 'message-line';
+            div.textContent = message;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function sendSingleMessage(message) {
+            return fetch('/api/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    return true;
+                } else {
+                    addToSendLog('Error: ' + data.message, true);
+                    return false;
+                }
+            })
+            .catch(error => {
+                addToSendLog('Error: ' + error, true);
+                return false;
+            });
+        }
+        
+        async function sendCommands() {
+            const textarea = document.getElementById('send-textarea');
+            const text = textarea.value;
+            if (!text.trim()) return;
+            
+            // Save to command history (store the original input)
+            commandHistory.push(text);
+            historyIndex = commandHistory.length;  // Reset to end of history
+            tempInput = '';
+            
+            // Parse text by newlines and semicolons, send each command individually
+            const commands = text.split(/[\n;]/).filter(cmd => cmd.trim() !== '');
+            
+            for (let i = 0; i < commands.length; i++) {
+                const command = commands[i].trim();
+                const success = await sendSingleMessage(command);
+                if (success) {
+                    addToSendLog(command);
+                }
+            }
+            
+            textarea.value = '';
+            textarea.focus();  // Keep cursor active in input area for pasting
+        }
+        
+        function navigateHistory(direction) {
+            const textarea = document.getElementById('send-textarea');
+            
+            if (commandHistory.length === 0) return;
+            
+            // Save current input if we're at the end (not navigating yet)
+            if (historyIndex === commandHistory.length) {
+                tempInput = textarea.value;
+            }
+            
+            if (direction === 'up') {
+                // Go back in history
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    textarea.value = commandHistory[historyIndex];
+                }
+            } else if (direction === 'down') {
+                // Go forward in history
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    textarea.value = commandHistory[historyIndex];
+                } else if (historyIndex === commandHistory.length - 1) {
+                    // Return to the temp input
+                    historyIndex = commandHistory.length;
+                    textarea.value = tempInput;
+                }
+            }
+            
+            // Move cursor to end of text
+            textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+        }
+        
+        // Handle keyboard shortcuts in textarea
+        document.addEventListener('DOMContentLoaded', function() {
+            const textarea = document.getElementById('send-textarea');
+            textarea.addEventListener('keydown', function(event) {
+                // Ctrl+Enter to send
+                if (event.key === 'Enter' && event.ctrlKey) {
+                    event.preventDefault();
+                    sendCommands();
+                }
+                // Up arrow for previous command (only when cursor at start or empty)
+                else if (event.key === 'ArrowUp') {
+                    const atStart = textarea.selectionStart === 0 && textarea.selectionEnd === 0;
+                    const isEmpty = textarea.value === '';
+                    if (atStart || isEmpty) {
+                        event.preventDefault();
+                        navigateHistory('up');
+                    }
+                }
+                // Down arrow for next command (only when cursor at end or empty)
+                else if (event.key === 'ArrowDown') {
+                    const atEnd = textarea.selectionStart === textarea.value.length;
+                    const isEmpty = textarea.value === '';
+                    if (atEnd || isEmpty) {
+                        event.preventDefault();
+                        navigateHistory('down');
+                    }
+                }
+            });
+        });
+        
+        function clearSendLog() {
+            document.getElementById('send-log').innerHTML = '<div class="empty-state">No messages sent yet...</div>';
+            sendLogEmpty = true;
+        }
+        
+        function clearReceiveLog() {
+            document.getElementById('receive-log').innerHTML = '<div class="empty-state">Waiting for incoming messages...</div>';
+            receiveLogEmpty = true;
+            allReceivedMessages = [];
+        }
+        
+        function downloadReceivedMessages() {
+            if (allReceivedMessages.length === 0) {
+                alert('No messages to download.');
+                return;
+            }
+            
+            const content = allReceivedMessages.join('\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'robotMessage.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function pollReceivedMessages() {
+            fetch('/api/receive?last_id=' + lastMessageId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.messages && data.messages.length > 0) {
+                        data.messages.forEach(msg => {
+                            addToReceiveLog(msg.text);
+                            allReceivedMessages.push(msg.text);
+                            lastMessageId = msg.id;
+                        });
+                    }
+                    // Update USB status
+                    const statusEl = document.getElementById('usb-status');
+                    const statusText = document.getElementById('usb-status-text');
+                    if (data.usb_connected) {
+                        statusEl.className = 'usb-status connected';
+                        statusText.textContent = 'USB Connected: ' + data.usb_port;
+                    } else {
+                        statusEl.className = 'usb-status disconnected';
+                        statusText.textContent = 'USB Disconnected';
+                    }
+                })
+                .catch(() => {
+                    // Connection error - silent
+                });
+        }
+        
+        // Poll for new messages every 500ms
+        setInterval(pollReceivedMessages, 500);
+        
+        // Initial poll
+        pollReceivedMessages();
+    </script>
+</body>
+</html>
